@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E02: Velocity from Position — SE Zoo</title>
+    <meta name="description" content="Interactive exploration of how numerical differentiation amplifies measurement noise catastrophically.">
+    <style>
+        :root{--bg-primary:#0d1117;--bg-secondary:#161b22;--bg-card:#1c2128;--bg-card-hover:#272d36;--bg-input:#21262d;--text-primary:#e6edf3;--text-secondary:#8b949e;--text-muted:#6e7681;--text-link:#58a6ff;--border-default:#30363d;--border-muted:#21262d;--radius-sm:6px;--radius-md:10px;--transition:.2s ease;--accent:#56d364}
+        :root[data-theme="light"]{--bg-primary:#ffffff;--bg-secondary:#f6f8fa;--bg-card:#ffffff;--bg-card-hover:#f3f4f6;--bg-input:#f6f8fa;--text-primary:#1f2328;--text-secondary:#656d76;--text-muted:#8b949e;--text-link:#0969da;--border-default:#d0d7de;--border-muted:#d8dee4}
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:var(--text-primary);background:var(--bg-primary);-webkit-font-smoothing:antialiased;line-height:1.6}
+    </style>
+    <link rel="stylesheet" href="../../css/item.css">
+    <link rel="stylesheet" href="../../css/animation.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <div class="item-page">
+        <nav class="item-nav">
+            <a href="https://malphons.github.io/app_se_zoo/" class="item-nav__back">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                Back to SE Zoo
+            </a>
+            <button class="item-nav__theme-toggle" aria-label="Toggle theme">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            </button>
+        </nav>
+
+        <section class="item-hero">
+            <h1 class="item-hero__title">Velocity from Position</h1>
+            <div class="item-hero__meta">
+                <span class="item-hero__module-id">E02</span>
+                <span class="item-hero__badge" style="background:#3fb950;color:#fff">Foundations</span>
+                <span class="item-hero__badge" style="background:rgba(86,211,100,.15);color:#56d364">Numerical Derivatives</span>
+                <span class="item-hero__badge" style="background:var(--bg-card);color:var(--text-secondary);border:1px solid var(--border-default)">Pendulum</span>
+                <span class="item-hero__year">Est. 1964</span>
+            </div>
+            <p class="item-hero__desc">
+                Numerical differentiation amplifies noise catastrophically. See why faster
+                sampling can make velocity estimates <em>worse</em>, not better.
+            </p>
+        </section>
+
+        <div class="item-prereqs">
+            <span class="item-prereqs__label">Prerequisite:</span>
+            <a href="https://malphons.github.io/se-zoo-fnd-noise/items/noisy-sensors/" class="item-related__link" style="padding:3px 10px;font-size:.75rem">E01: Noisy Sensors</a>
+        </div>
+
+        <div class="item-viz">
+            <div class="item-viz__split">
+                <div class="item-robot" id="robot-container">
+                    <span class="item-robot__label">Robot View</span>
+                </div>
+                <div class="item-diagram">
+                    <div class="item-diagram__controls">
+                        <button class="item-diagram__btn" id="btn-toggle-view">Show Velocity</button>
+                        <button class="item-diagram__btn" id="btn-regenerate">Regenerate</button>
+                        <button class="item-diagram__btn" onclick="SEZoo.diagram.resetZoom()">Reset View</button>
+                    </div>
+                    <div id="diagram-container"></div>
+                </div>
+            </div>
+            <div class="item-transport">
+                <button class="item-transport__btn" id="btn-step-back" aria-label="Step back">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="3" height="16"/><polygon points="20,4 8,12 20,20"/></svg>
+                </button>
+                <button class="item-transport__btn item-transport__btn--play" id="btn-play" aria-label="Play">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 20,12 6,21"/></svg>
+                </button>
+                <button class="item-transport__btn" id="btn-step-fwd" aria-label="Step forward">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="4,4 16,12 4,20"/><rect x="17" y="4" width="3" height="16"/></svg>
+                </button>
+                <input type="range" class="item-transport__scrubber" id="scrubber" min="0" max="200" value="0">
+                <span class="item-transport__frame" id="frame-display">0 / 200</span>
+                <select class="item-transport__speed" id="speed-select">
+                    <option value="0.5">0.5x</option>
+                    <option value="1" selected>1x</option>
+                    <option value="2">2x</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="item-sliders">
+            <div class="item-slider" id="slider-sigma">
+                <span class="item-slider__label">Noise \(\sigma\):</span>
+                <input type="range" class="item-slider__input" min="0.001" max="0.2" step="0.001" value="0.05">
+                <span class="item-slider__value">0.050</span>
+            </div>
+            <div class="item-slider" id="slider-dt">
+                <span class="item-slider__label">Sample \(\Delta t\) (s):</span>
+                <input type="range" class="item-slider__input" min="0.002" max="0.1" step="0.002" value="0.02">
+                <span class="item-slider__value">0.020</span>
+            </div>
+        </div>
+
+        <div class="item-stats" id="diagram-stats"></div>
+
+        <div class="item-tabs">
+            <button class="item-tab-btn item-tab-btn--active" data-tab="overview">Overview</button>
+            <button class="item-tab-btn" data-tab="howto">How It Works</button>
+            <button class="item-tab-btn" data-tab="math">Math</button>
+            <button class="item-tab-btn" data-tab="code">Code</button>
+            <button class="item-tab-btn" data-tab="references">References</button>
+        </div>
+
+        <div class="item-tab-content item-tab-content--active" id="tab-overview">
+            <div class="item-section">
+                <h2>Overview</h2>
+                <p>
+                    Robots need velocity for control, but many sensors only measure position. The
+                    naive approach &mdash; finite-difference differentiation $\dot{q} \approx (q_{k} - q_{k-1})/\Delta t$
+                    &mdash; amplifies measurement noise by a factor of $\sigma\sqrt{2}/\Delta t$.
+                </p>
+                <div class="item-insight">
+                    <div class="item-insight__label">Key Insight</div>
+                    <p style="color:var(--text-secondary);margin:0">
+                        Decreasing the sample period $\Delta t$ makes differentiation noise <em>worse</em>,
+                        not better. The noise amplification factor is $\sqrt{2}/\Delta t$, which grows
+                        without bound as $\Delta t \to 0$. This is the fundamental motivation for
+                        model-based observers (E03) and Kalman filters (E04).
+                    </p>
+                </div>
+                <h3>When to Use</h3>
+                <ul>
+                    <li>Quick velocity estimate when noise is low and sample rate is moderate</li>
+                    <li>Baseline comparison for evaluating filter performance</li>
+                    <li>Understanding the noise-bandwidth tradeoff in digital derivatives</li>
+                </ul>
+                <div class="item-proscons">
+                    <div class="item-pros">
+                        <h4>Advantages</h4>
+                        <ul>
+                            <li>No model required</li>
+                            <li>Zero latency (causal, one-step delay)</li>
+                            <li>Trivial to implement</li>
+                        </ul>
+                    </div>
+                    <div class="item-cons">
+                        <h4>Limitations</h4>
+                        <ul>
+                            <li>Catastrophic noise amplification</li>
+                            <li>Worse at higher sample rates</li>
+                            <li>No acceleration estimate</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item-tab-content" id="tab-howto">
+            <div class="item-section">
+                <h2>How It Works</h2>
+                <ol style="color:var(--text-secondary);padding-left:20px;margin-bottom:16px">
+                    <li style="margin-bottom:8px"><strong>Position measurement:</strong> $y_k = q_k + v_k$ where $v_k \sim \mathcal{N}(0, \sigma^2)$</li>
+                    <li style="margin-bottom:8px"><strong>Backward difference:</strong> $\hat{\dot{q}}_k = (y_k - y_{k-1}) / \Delta t$</li>
+                    <li style="margin-bottom:8px"><strong>Noise propagation:</strong> $\hat{\dot{q}}_k = \dot{q}_k + (v_k - v_{k-1}) / \Delta t$</li>
+                    <li style="margin-bottom:8px"><strong>Result:</strong> Velocity noise has std $\sigma_{\dot{q}} = \sigma\sqrt{2}/\Delta t$</li>
+                </ol>
+                <p>Try decreasing $\Delta t$ in the slider &mdash; watch the noisy velocity (red) explode while the position noise stays constant.</p>
+            </div>
+        </div>
+
+        <div class="item-tab-content" id="tab-math">
+            <div class="item-section">
+                <h2>Key Equations</h2>
+                <div class="item-math">
+                    <div class="item-math__label">Finite Difference</div>
+                    <p>$$\hat{\dot{q}}_k = \frac{y_k - y_{k-1}}{\Delta t} = \dot{q}_k + \frac{v_k - v_{k-1}}{\Delta t}$$</p>
+                </div>
+                <div class="item-math">
+                    <div class="item-math__label">Velocity Noise Variance</div>
+                    <p>$$\text{Var}\!\left(\frac{v_k - v_{k-1}}{\Delta t}\right) = \frac{2\sigma^2}{\Delta t^2}$$</p>
+                </div>
+                <div class="item-math">
+                    <div class="item-math__label">Noise Amplification Factor</div>
+                    <p>$$\text{AF} = \frac{\sigma_{\dot{q}}}{\sigma_q} = \frac{\sqrt{2}}{\Delta t}$$</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="item-tab-content" id="tab-code">
+            <div class="item-section">
+                <h2>MATLAB Implementation</h2>
+                <div class="item-code">
+                    <div class="item-code__label">MATLAB</div>
+                    <pre><code>%% E02: Velocity from Position
+sigma = 0.05; dt = 0.02; T = 4; f = 0.5; A = 1.0;
+t = 0:dt:T;
+q_true = A*sin(2*pi*f*t);
+qd_true = A*2*pi*f*cos(2*pi*f*t);
+y = q_true + sigma*randn(size(t));
+
+% Finite difference
+qd_est = diff(y)/dt;
+
+% Predicted noise std
+vel_noise_std = sigma*sqrt(2)/dt;
+fprintf('Vel noise std: predicted=%.2f\n', vel_noise_std);
+
+figure;
+subplot(2,1,1); plot(t,q_true,'g',t,y,'y.'); title('Position');
+subplot(2,1,2); plot(t(2:end),qd_true(2:end),'g',t(2:end),qd_est,'r');
+title(sprintf('Velocity (noise amplified %.0fx)', sqrt(2)/dt));</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="item-tab-content" id="tab-references">
+            <div class="item-section">
+                <h2>Key References</h2>
+                <ul>
+                    <li>Hamming, R.W. (1973). <em>Numerical Methods for Scientists and Engineers</em>, 2nd Ed. Dover.</li>
+                    <li>Anderssen, R.S. & Bloomfield, P. (1974). Numerical Differentiation Procedures for Non-Exact Data. <em>Numerische Mathematik</em>, 22(3).</li>
+                </ul>
+                <h3>Related Modules</h3>
+                <div class="item-related">
+                    <a href="https://malphons.github.io/se-zoo-fnd-noise/items/noisy-sensors/" class="item-related__link">&larr; E01: Noisy Sensors</a>
+                    <a href="https://malphons.github.io/se-zoo-fnd-model-observer/items/luenberger/" class="item-related__link">E03: Luenberger Observer &rarr;</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/data.js"></script>
+    <script src="../../js/shared-diagram.js"></script>
+    <script src="../../js/shared-animation.js"></script>
+    <script src="../../js/shared-tabs.js"></script>
+
+    <script>
+    (function () {
+        'use strict';
+        var data = SEZoo.itemData;
+        var showVelocity = false;
+        var sim, anim;
+
+        SEZoo.tabs.init({ themeKey: 'sezoo_theme' });
+
+        var robot = SEZoo.anim.createRobotSvg('#robot-container', {
+            viewBox: '-150 -30 300 280'
+        });
+
+        function initDiagram(yDom, yLab) {
+            SEZoo.diagram.destroy();
+            SEZoo.diagram.init('#diagram-container', {
+                width: 800, height: 380,
+                xDomain: [0, data.params.duration],
+                yDomain: yDom,
+                xLabel: 'Time (s)', yLabel: yLab
+            });
+        }
+
+        function renderChart() {
+            if (showVelocity) {
+                initDiagram([-6, 6], 'Velocity (rad/s)');
+                SEZoo.diagram.drawTimeSeries(sim.trueVel, { color: '#3fb950', width: 2.5, className: 'se-true-vel' });
+                SEZoo.diagram.drawTimeSeries(sim.noisyVel, { color: '#f85149', width: 1, opacity: 0.6, className: 'se-noisy-vel', animate: false });
+            } else {
+                initDiagram([-1.5, 1.5], 'Position (rad)');
+                SEZoo.diagram.drawTimeSeries(sim.truePos, { color: '#3fb950', width: 2.5, className: 'se-true-pos' });
+                SEZoo.diagram.drawScatterPoints(sim.noisyPos, { color: '#f0c808', radius: 2, opacity: 0.4, className: 'se-noisy-pos', delayPerPoint: 1 });
+            }
+            var s = sim.stats;
+            document.getElementById('diagram-stats').textContent =
+                '\u03C3_pos: ' + s.posNoiseStd.toFixed(3) +
+                '  |  \u03C3_vel: ' + s.velNoiseStd.toFixed(1) +
+                '  |  Amplification: ' + s.amplification.toFixed(0) + 'x' +
+                '  |  Vel SNR: ' + s.velSnrDb.toFixed(1) + ' dB' +
+                '  |  \u0394t: ' + (s.dt * 1000).toFixed(0) + ' ms';
+        }
+
+        function renderRobotFrame(frame) {
+            if (!sim || !robot) return;
+            var posIdx = Math.min(frame, sim.truePos.length - 1);
+            var velIdx = Math.min(frame - 1, sim.noisyVel.length - 1);
+            var angle = sim.truePos[posIdx].v;
+            var t = sim.truePos[posIdx].t;
+            var L = 140;
+
+            /* Draw pendulum */
+            var bob = SEZoo.anim.drawPendulum(robot.g, angle, L, {
+                color: SEZoo.anim.SE_COLORS.true_state
+            });
+
+            /* True velocity arrow (green) */
+            var trueVel = sim.trueVel[posIdx].v;
+            var vxTrue = L * Math.cos(angle) * trueVel * 0.08;
+            var vyTrue = -L * Math.sin(angle) * trueVel * 0.08;
+            SEZoo.anim.drawVelocityArrow(robot.g, bob.bx, bob.by, vxTrue, vyTrue, {
+                color: SEZoo.anim.SE_COLORS.true_state,
+                scale: 1, label: '\u1E9B=' + trueVel.toFixed(1),
+                className: 'robot-vel-true'
+            });
+
+            /* Noisy velocity arrow (red) */
+            if (velIdx >= 0) {
+                var noisyVel = sim.noisyVel[velIdx].v;
+                var vxNoisy = L * Math.cos(angle) * noisyVel * 0.08;
+                var vyNoisy = -L * Math.sin(angle) * noisyVel * 0.08;
+                SEZoo.anim.drawVelocityArrow(robot.g, bob.bx, bob.by, vxNoisy, vyNoisy, {
+                    color: SEZoo.anim.SE_COLORS.error,
+                    scale: 1, label: '\u1E9B\u2099=' + noisyVel.toFixed(1),
+                    className: 'robot-vel-noisy'
+                });
+            }
+
+            /* Angle label */
+            SEZoo.anim.drawAngleLabel(robot.g, 0, 0, angle, {
+                color: SEZoo.anim.SE_COLORS.true_state
+            });
+
+            /* Time cursor on chart */
+            var scales = SEZoo.diagram.getScales();
+            var dims = SEZoo.diagram.getDims();
+            var margin = SEZoo.diagram.getMargin();
+            SEZoo.anim.drawTimeCursor(SEZoo.diagram.getSvg(), scales.x, t, dims.height, margin);
+        }
+
+        function regenerate() {
+            sim = data.generate();
+            renderChart();
+            if (anim) anim.reset(sim.truePos.length);
+        }
+
+        sim = data.generate();
+        renderChart();
+
+        anim = new SEZoo.anim.AnimController({
+            totalFrames: sim.truePos.length,
+            fps: 30,
+            playBtn: document.getElementById('btn-play'),
+            scrubber: document.getElementById('scrubber'),
+            frameDisplay: document.getElementById('frame-display'),
+            speedSelect: document.getElementById('speed-select'),
+            stepBackBtn: document.getElementById('btn-step-back'),
+            stepFwdBtn: document.getElementById('btn-step-fwd'),
+            onFrame: renderRobotFrame
+        });
+
+        document.getElementById('btn-toggle-view').addEventListener('click', function () {
+            showVelocity = !showVelocity;
+            this.textContent = showVelocity ? 'Show Position' : 'Show Velocity';
+            this.classList.toggle('item-diagram__btn--active', showVelocity);
+            renderChart();
+        });
+        document.getElementById('btn-regenerate').addEventListener('click', regenerate);
+
+        document.querySelector('#slider-sigma .item-slider__input').addEventListener('input', function () {
+            data.params.sigma = parseFloat(this.value);
+            document.querySelector('#slider-sigma .item-slider__value').textContent = data.params.sigma.toFixed(3);
+            regenerate();
+        });
+        document.querySelector('#slider-dt .item-slider__input').addEventListener('input', function () {
+            data.params.dt = parseFloat(this.value);
+            document.querySelector('#slider-dt .item-slider__value').textContent = data.params.dt.toFixed(3);
+            regenerate();
+        });
+    })();
+    </script>
+</body>
+</html>

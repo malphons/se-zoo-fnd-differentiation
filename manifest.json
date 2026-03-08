@@ -1,0 +1,27 @@
+{
+    "schema_version": "1.0",
+    "repo_id": "se-zoo-fnd-differentiation",
+    "group": "foundations",
+    "category": "differentiation",
+    "label": "Numerical Derivatives",
+    "color_accent": "#56d364",
+    "items": [
+        {
+            "id": "velocity-from-pos",
+            "module_id": "E02",
+            "name": "Velocity from Position",
+            "short_description": "Numerical differentiation amplifies noise catastrophically. See why faster sampling makes velocity estimates worse, not better.",
+            "group": "foundations",
+            "category": "differentiation",
+            "tags": ["differentiation", "finite-difference", "noise-amplification", "sampling", "low-pass"],
+            "year_introduced": 1964,
+            "key_paper": "Hamming (1973)",
+            "complexity": "beginner",
+            "color_accent": "#56d364",
+            "robot": "Pendulum",
+            "core_concept": "Differentiation amplifies noise",
+            "use_cases": ["Velocity estimation", "Sample rate selection", "Filter design"],
+            "related_items": ["noisy-sensors", "luenberger"]
+        }
+    ]
+}
